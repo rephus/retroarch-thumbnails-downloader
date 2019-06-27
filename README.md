@@ -4,7 +4,7 @@ Script to downloads all missing images for a playlist on Retroarch
 
 node main.js <playlist file> <thumbnail folder>
 
-node main.js "~/.config/retroarch/playlists/SNK - Neo Geo.lpl" "~/thumbnails/SNK - Neo Geo/Named_Snaps"
+node main.js "$HOME/.config/retroarch/playlists/SNK - Neo Geo.lpl" "$HOME/thumbnails/SNK - Neo Geo/Named_Snaps"
 
 ## How it works
 
@@ -17,3 +17,7 @@ There is another bash script that converts all .jpg images (not supported by ret
 Requires imagemagick binaries to work
 
 
+## TODO 
+
+* Filter image on DDG based on the platform (tetris is not the same on all platforms)
+* Integrate jpg-png conversion in nodejs

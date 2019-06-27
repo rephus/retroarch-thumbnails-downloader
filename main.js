@@ -11,6 +11,7 @@ console.log(" ARGS: " , process.argv);
 var fileToRead = process.argv[2]; 
 var folderToWrite = process.argv[3] + "/";
 var imageType = "screenshot"; 
+var platform = fileToRead.split('/').slice(-1)[0].split('.')[0] //eg: SNK - Neo Geo
 
 var saveImage = function(imgUrl, path, callback){
 
@@ -22,8 +23,10 @@ var saveImage = function(imgUrl, path, callback){
     ext = ext.split("?")[0];
     if (ext.length> 3) ext = "jpg"; //wrong ext 
     
-    request.head(imgUrl, function(err, res, body){    
+    //request.head(imgUrl, function(err, res, body){    
         request(imgUrl).pipe(fs.createWriteStream(path+"." +ext)).on('close', function(){
+
+           
             // convert jpg image to png 
             /*if (ext != "png") {
                 Gm(path).resize(304, 224, "!").write(path+".png", function (err) {
@@ -32,23 +35,7 @@ var saveImage = function(imgUrl, path, callback){
                 });
             }*/
         });
-    });
-
-    /*
-    http.get(imgUrl, function(response) {
-        response.pipe(f);
-        response.on('data', function() { });
-        response.on('end',function(){
-          callback({
-              error: false,
-              img: "/image?path="+path
-          });
-      });
-    }).on("error", function(e){
-        callback({
-            error: "Unable to save image from " + imgUrl + " into " + path + ": " + e
-        });
-    });*/
+    //});
   }
 
 var secureImageSearch = function(q, hash, callback){
@@ -56,7 +43,7 @@ var secureImageSearch = function(q, hash, callback){
   var extraArgs = "&l=wt-wt&o=json&vqd="+hash+"&f=";
   var url = "https://duckduckgo.com/i.js?&q=" + q+ extraArgs;
 
-  console.log("Searching "+url);
+  //console.log("Searching "+url);
 
    request
      .get( url )
@@ -90,7 +77,7 @@ var downloadImage = function(name, callback) {
     var startTime = Date.now();
     //var url = "https://duckduckgo.com/i.js?o=json&q=" + encodeURI(name);
     var url = "https://duckduckgo.com/?q="+encodeURI(name)+"&t=vivaldi&iax=1&ia=images"; 
-    console.log("Searching " + url);
+    //console.log("Searching " + url);
 
     request
         .get(url)
@@ -98,7 +85,7 @@ var downloadImage = function(name, callback) {
           var body = res.text;
           //We need to filter the key on the code `vqd='327358238202064368347621428791274365820';`
           var hash = body.substr(body.indexOf('vqd=')+5).split("'")[0];
-           console.log("VQD SEARCH " , body.indexOf('vqd=')+5 , hash); 
+           //console.log("VQD SEARCH " , body.indexOf('vqd=')+5 , hash); 
             if (body.indexOf('vqd=') < 1 ) {
                 console.error("Unable to get vdq hash from DDG ", body.indexOf('vqd=')); 
             } else {
@@ -109,63 +96,71 @@ var downloadImage = function(name, callback) {
 
 };
 
-var lineReader = require('readline').createInterface({
-    input: fs.createReadStream(fileToRead)
-  });
+
 
 var thumbnailName = function(gameName) {
-    var gameNameWithoutSlash = gameName.replace(/\//g, '_');
+    var gameNameWithoutSlash = gameName.replace(/\//g, '_').replace(/:/g, '_');
     return folderToWrite+ gameNameWithoutSlash; 
 
 }
 var downloadGame = function(gameName) {
-    downloadImage(gameName+ " " + imageType, function(err, imgUrl){
-        if (err || !imgUrl) console.error("Unable to get img", err, imgUrl);
+    downloadImage(gameName+ " " +platform + " "+ imageType, function(err, imgUrl){
+        if (err || !imgUrl) console.error("Unable to get img for " + gameName, err, imgUrl);
         else saveImage(imgUrl, thumbnailName(gameName), function(err, result){
             //console.log(err, result); 
         });
     });
 }
-/*
-Gm("/home/rephus/thumbnails/SNK - Neo Geo/Named_Snaps/Waku Waku 7.jpg")
-    .resize(304, 224, "!")
-    .write("/home/rephus/thumbnails/SNK - Neo Geo/Named_Snaps/Waku Waku 7.png", function (err) {
-    if (err) console.error("Unable to convert to png "+path, err);
-    else fs.unlinkSync("/home/rephus/thumbnails/SNK - Neo Geo/Named_Snaps/Waku Waku 7.jpg");
 
-});*/
-
-var lineN = 0; 
-  lineReader.on('line', function (line) {
-    lineN ++; 
-    if (lineN % 6 == 2) {
-        console.log(lineN +': '+ line);
-        try{
-            if (fs.existsSync( thumbnailName(line) + ".png" ) 
-                //fs.existsSync( thumbnailName(line) + ".jpg" ) || 
-                //fs.existsSync( thumbnailName(line) + ".gif" )
-                ) {
-                    
-                    console.log("Thumbnail already exists: " + line);
-            } else {
-                downloadGame(line);
+// File format is JSON
+fs.readFile(fileToRead, (err, data) => {  
+    if (err) throw err;
+    try {
+        let playlist = JSON.parse(data);
+        console.log("Reading JSON, with "+ playlist.items.length +  " games")
+        
+        playlist.items.forEach((game) => {
+            const gameName = game.label
+            try{
+                if (fs.existsSync( thumbnailName(gameName) + ".png" ) ) {
+                        console.log("Thumbnail already exists: " + gameName);
+                } else {
+                    downloadGame(gameName);
+                }
+            } catch(e){
+                console.error("Unable to download screenshot for " + gameName , e);        
             }
-              
-        } catch(e){
-            console.error("Unable to download screenshot for " + line , e);        
-        }
+        })
+    } catch (e) {
+        console.error("Unable to read JSON file ", e) 
+       readOldFormat()
     }
 });
 
-  /*
-downloadImage("Metal Slug 4 screenshot", function(error, imgUrl){
-    saveImage(imgUrl, folderToWrite+ "metal-slug-4", function(err, result){
-        console.log(err, result); 
-    });
-});*/
-/*
-saveImage("http://images.nintendolife.com/screenshots/45754/full.jpg", 
-    folder+ "metal-slug-4", function(err, result){
-    console.log(err, result); 
-});*/
 
+function readOldFormat() {
+    console.warn("Reading old format")
+     // File format is old
+     var lineReader = require('readline').createInterface({ input: fs.createReadStream(fileToRead)  });
+     // Only load old file format if JSON fails
+     var lineN = 0; 
+     lineReader.on('line', function (line) {
+     lineN ++; 
+     if (lineN % 6 == 2) {
+         console.log(lineN +': '+ line);
+         try{
+             if (fs.existsSync( thumbnailName(line) + ".png" ) 
+                 //fs.existsSync( thumbnailName(line) + ".jpg" ) || 
+                 //fs.existsSync( thumbnailName(line) + ".gif" )
+                 ) {
+                     console.log("Thumbnail already exists: " + line);
+             } else {
+                 downloadGame(line);
+             }
+                 
+         } catch(e){
+             console.error("Unable to download screenshot for " + line , e);        
+         }
+     }
+     });
+}
